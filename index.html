@@ -34,17 +34,22 @@
     background: #2e7d32;
   }
   #webcam-container {
-  margin: 20px auto;
-  width: 320px;
-  height: 320px;
-  border: 4px solid #2e7d32;
-  border-radius: 10px;
-}
-canvas {
-  width: 100%;
-  height: 100%;
-}
-
+    margin: 20px auto;
+    width: 320px;
+    height: 320px;
+    border: 4px solid #2e7d32;
+    border-radius: 10px;
+  }
+  #webcam-container canvas {
+    width: 100%;
+    height: 100%;
+  }
+  #label-container {
+    margin-top: 15px;
+    font-size: 20px;
+    font-weight: bold;
+    color: #1b5e20;
+  }
 </style>
 </head>
 
@@ -55,7 +60,7 @@ canvas {
 <p>Place your crop leaf in front of the camera and click buttons:</p>
 
 <button onclick="init()">Start Camera</button>
-<button onclick="predictLeaf()">Predict</button>
+<button onclick="predictOnce()">Predict</button>
 
 <div id="webcam-container"></div>
 <div id="label-container"></div>
@@ -71,18 +76,24 @@ canvas {
     labelContainer = document.getElementById("label-container");
     labelContainer.innerText = "Loading model and camera…";
 
-    model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
-    maxPredictions = model.getTotalClasses();
+    try {
+      model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
+      maxPredictions = model.getTotalClasses();
 
-    webcam = new tmImage.Webcam(320, 320, true);
-    await webcam.setup();
-    await webcam.play();
-    document.getElementById("webcam-container").appendChild(webcam.canvas);
+      webcam = new tmImage.Webcam(320, 320, true);
+      await webcam.setup();
+      await webcam.play();
 
-    labelContainer.innerText = "Model loaded — Ready!";
+      document.getElementById("webcam-container").appendChild(webcam.canvas);
+
+      labelContainer.innerText = "Model loaded — Ready!";
+    } catch (err) {
+      labelContainer.innerText = "Error loading model or camera!";
+      console.error(err);
+    }
   }
 
-  async function predictLeaf() {
+  async function predictOnce() {
     if (!model || !webcam) {
       alert("Start camera first!");
       return;
@@ -98,10 +109,10 @@ canvas {
     }
 
     const percent = (best.probability * 100).toFixed(1);
-    labelContainer.innerText = `${best.className} — ${percent}%`;
+    document.getElementById("label-container").innerText =
+      `${best.className} — ${percent}%`;
   }
 </script>
 
 </body>
 </html>
-
