@@ -1,137 +1,155 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Crop Disease Detector</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<title>Crop Disease Detector</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #eaf7ea;
-      text-align: center;
-      margin: 0;
-    }
-    header {
-      background: #2e7d32;
-      color: white;
-      padding: 15px;
-      font-size: 22px;
-      font-weight: bold;
-    }
-    .container {
-      padding: 20px;
-    }
-    button {
-      background: #4caf50;
-      color: white;
-      border: none;
-      padding: 12px 18px;
-      margin: 10px;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    #webcam-container {
-      margin: 20px auto;
-      width: 280px;
-      height: 280px;
-      border: 4px solid #2e7d32;
-      border-radius: 12px;
-      background: black;
-    }
-    #label-container {
-      font-size: 18px;
-      margin-top: 15px;
-      color: #1b5e20;
-      font-weight: bold;
-    }
-  </style>
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #eaf7ea;
+  text-align: center;
+}
+header {
+  background: #2e7d32;
+  color: white;
+  padding: 15px;
+  font-size: 22px;
+  font-weight: bold;
+}
+.container {
+  padding: 20px;
+}
+button {
+  background: #4caf50;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  margin: 10px;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+}
+video {
+  width: 280px;
+  height: 280px;
+  border: 4px solid #2e7d32;
+  border-radius: 12px;
+  margin-top: 20px;
+}
+#result {
+  font-size: 18px;
+  font-weight: bold;
+  margin-top: 15px;
+  color: #1b5e20;
+}
+#remedy {
+  margin-top: 10px;
+  font-size: 15px;
+  color: #b71c1c;
+}
+</style>
 </head>
 
 <body>
-  <header>🌱 Crop Disease Detector</header>
+<header>🌱 Crop Disease Detector</header>
 
-  <div class="container">
-    <p>Place your crop leaf in front of the camera and click buttons:</p>
+<div class="container">
+  <p>Place the leaf in front of the camera</p>
 
-    <button onclick="startCamera()">Start Camera</button>
-    <button onclick="predict()">Predict</button>
+  <button onclick="startCamera()">Start Camera</button>
+  <button onclick="predict()">Predict</button>
 
-    <div id="webcam-container"></div>
-    <div id="label-container">Loading model...</div>
-  </div>
+  <br>
+  <video id="video" autoplay playsinline muted></video>
 
-  <script>
-    const URL = "https://teachablemachine.withgoogle.com/models/i7je_3xwZ/";
+  <div id="result">Loading model…</div>
+  <div id="remedy"></div>
+</div>
 
-    let model, webcam, maxPredictions;
-    let history = [];
-    const STABLE_FRAMES = 5;
-    const CONFIDENCE = 0.7;
+<script>
+const MODEL_URL = "https://teachablemachine.withgoogle.com/models/i7je_3xwZ/";
 
-    async function loadModel() {
-      const modelURL = URL + "model.json";
-      const metadataURL = URL + "metadata.json";
+let model;
+let video = document.getElementById("video");
+let history = [];
+const STABLE_FRAMES = 6;
+const CONFIDENCE = 0.75;
 
-      model = await tmImage.load(modelURL, metadataURL);
-      maxPredictions = model.getTotalClasses();
+async function loadModel() {
+  model = await tmImage.load(
+    MODEL_URL + "model.json",
+    MODEL_URL + "metadata.json"
+  );
+  document.getElementById("result").innerText =
+    "Model loaded. Tap Start Camera.";
+}
+loadModel();
 
-      document.getElementById("label-container").innerText =
-        "Model loaded. Click Start Camera.";
-    }
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { exact: "environment" } },
+      audio: false
+    });
+    video.srcObject = stream;
+  } catch (err) {
+    // fallback if rear camera exact fails
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+      audio: false
+    });
+    video.srcObject = stream;
+  }
+}
 
-    async function startCamera() {
-      try {
-        webcam = new tmImage.Webcam(280, 280, false);
+async function predict() {
+  if (!model || video.readyState !== 4) {
+    document.getElementById("result").innerText =
+      "Camera not ready. Start camera first.";
+    return;
+  }
 
-        await webcam.setup({
-          facingMode: "environment"
-        });
+  const prediction = await model.predict(video);
+  prediction.sort((a, b) => b.probability - a.probability);
 
-        await webcam.play();
-        window.requestAnimationFrame(loop);
+  if (prediction[0].probability < CONFIDENCE) {
+    history = [];
+    document.getElementById("result").innerText = "Hold leaf steady…";
+    document.getElementById("remedy").innerText = "";
+    return;
+  }
 
-        document.getElementById("webcam-container").innerHTML = "";
-        document.getElementById("webcam-container").appendChild(webcam.canvas);
+  history.push(prediction[0].className);
+  if (history.length > STABLE_FRAMES) history.shift();
+  if (!history.every(v => v === history[0])) return;
 
-      } catch (e) {
-        document.getElementById("label-container").innerText =
-          "Camera permission denied. Allow camera access and reload.";
-      }
-    }
+  const label = prediction[0].className;
+  const percent = (prediction[0].probability * 100).toFixed(1);
 
-    async function loop() {
-      webcam.update();
-      window.requestAnimationFrame(loop);
-    }
+  document.getElementById("result").innerText =
+    `${label} — ${percent}%`;
 
-    async function predict() {
-      if (!webcam || !model) return;
-
-      const prediction = await model.predict(webcam.canvas);
-      prediction.sort((a, b) => b.probability - a.probability);
-
-      if (prediction[0].probability < CONFIDENCE) {
-        history = [];
-        document.getElementById("label-container").innerText =
-          "Hold leaf steady...";
-        return;
-      }
-
-      history.push(prediction[0].className);
-      if (history.length > STABLE_FRAMES) history.shift();
-
-      if (!history.every(v => v === history[0])) return;
-
-      document.getElementById("label-container").innerHTML =
-        `${prediction[0].className} — ${(prediction[0].probability * 100).toFixed(1)}%`;
-    }
-
-    loadModel();
-  </script>
+  // Remedies
+  if (label.toLowerCase().includes("unhealthy")) {
+    document.getElementById("remedy").innerHTML = `
+      ⚠️ Possible actions:<br>
+      • Remove infected leaves<br>
+      • Avoid over-watering<br>
+      • Improve sunlight & airflow<br>
+      • Use organic fungicide / neem oil<br>
+      • Monitor for 5–7 days
+    `;
+  } else {
+    document.getElementById("remedy").innerText =
+      "✅ Plant appears healthy. Continue regular care.";
+  }
+}
+</script>
 </body>
 </html>
