@@ -3,127 +3,103 @@
 <head>
   <meta charset="UTF-8">
   <title>Crop Disease Detector</title>
-  <!-- Load TensorFlow.js -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <style>
     body {
-      font-family: 'Segoe UI', Arial, sans-serif;
-      background: linear-gradient(135deg, #74ebd5 0%, #ACB6E5 100%);
-      color: #333;
-      text-align: center;
       margin: 0;
-      padding: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #7ee8fa, #80ff72);
+      text-align: center;
     }
-    h1 {
-      margin-top: 40px;
-      font-size: 2.5em;
-      color: #fff;
-      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-    }
-    .container {
-      margin: 50px auto;
-      padding: 30px;
-      background: rgba(255, 255, 255, 0.9);
-      border-radius: 12px;
-      width: 80%;
-      max-width: 600px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-    }
-    button {
-      background: #ff6f61;
-      border: none;
-      padding: 12px 24px;
-      font-size: 1.1em;
-      color: #fff;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.3s ease;
-      margin: 10px;
-    }
-    button:hover { background: #ff3b2e; }
-    video {
-      margin-top: 20px;
-      border: 4px solid #ff6f61;
-      border-radius: 12px;
-      width: 100%;
-      max-width: 500px;
-    }
-    #result {
-      margin-top: 20px;
-      font-size: 1.5em;
+
+    header {
+      background: #1e8e3e;
+      color: white;
+      padding: 15px;
+      font-size: 24px;
       font-weight: bold;
-      color: #333;
+    }
+
+    .container {
+      background: white;
+      width: 90%;
+      max-width: 500px;
+      margin: 30px auto;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+
+    button {
+      background: #ff7043;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      font-size: 16px;
+      border-radius: 8px;
+      margin: 10px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #ff5722;
+    }
+
+    video {
+      width: 100%;
+      border-radius: 10px;
+      border: 3px solid #ff7043;
+      margin-top: 15px;
+    }
+
+    #status {
+      margin-top: 15px;
+      font-weight: bold;
+      font-size: 18px;
     }
   </style>
 </head>
+
 <body>
-  <h1>🌱 Crop Disease Detector</h1>
+
+  <header>🌱 Crop Disease Detector</header>
 
   <div class="container">
-    <p>Place your crop leaf in front of the camera to detect if it’s healthy or unhealthy.</p>
+    <p>Point your phone camera at a crop leaf.</p>
+
     <button onclick="startCamera()">Start Camera</button>
-    <button onclick="makePrediction()">Predict</button>
+    <button onclick="predict()">Predict</button>
+
     <video id="video" autoplay playsinline></video>
-    <div id="result"></div>
+
+    <div id="status"></div>
   </div>
 
   <script>
-    let model;
+    const video = document.getElementById("video");
+    const statusText = document.getElementById("status");
 
-    // Load the model from root
-    async function loadModel() {
-      try {
-        model = await tf.loadLayersModel('model.json'); 
-        console.log("✅ Model loaded successfully");
-      } catch (error) {
-        console.error("❌ Error loading model:", error);
-      }
-    }
-
-    // Start camera
     async function startCamera() {
-      const video = document.getElementById('video');
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+          audio: false
+        });
         video.srcObject = stream;
+        statusText.innerText = "Camera started ✔";
+        statusText.style.color = "green";
       } catch (err) {
-        alert("Camera access blocked. Please allow camera.");
+        statusText.innerText = "Camera access denied ❌";
+        statusText.style.color = "red";
       }
     }
 
-    // Make prediction
-    async function makePrediction() {
-      if (!model) {
-        alert("Model not loaded yet!");
-        return;
-      }
-      const video = document.getElementById('video');
-
-      // Capture frame from video
-      const tensor = tf.browser.fromPixels(video)
-        .resizeNearestNeighbor([224, 224]) // adjust if your model expects different size
-        .toFloat()
-        .expandDims();
-
-      const prediction = model.predict(tensor);
-      const result = await prediction.data();
-
-      // Example: binary classification [Healthy, Unhealthy]
-      const healthyProb = result[0];
-      const unhealthyProb = result[1];
-
-      let output = "";
-      if (healthyProb > unhealthyProb) {
-        output = "✅ Leaf is Healthy";
-      } else {
-        output = "⚠️ Leaf is Unhealthy";
-      }
-
-      document.getElementById('result').innerText = output;
+    function predict() {
+      statusText.innerText = "Prediction coming soon (AI model not added yet)";
+      statusText.style.color = "blue";
     }
-
-    // Load model on page start
-    loadModel();
   </script>
+
 </body>
 </html>
