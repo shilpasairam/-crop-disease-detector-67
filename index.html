@@ -1,28 +1,132 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <title>AI Crop Disease Detector</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Camera Test</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0f5132;
+      color: white;
+      text-align: center;
+    }
+    button {
+      padding: 15px;
+      font-size: 18px;
+      width: 100%;
+      border: none;
+      background: #198754;
+      color: white;
+    }
+    video {
+      width: 100%;
+      max-height: 60vh;
+      background: black;
+    }
+    #result {
+      font-size: 22px;
+      margin-top: 15px;
+    }
+    #advice {
+      margin: 15px;
+      padding: 15px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 10px;
+      display: none;
+    }
+  </style>
 </head>
-<body style="margin:0; background:black;">
 
-<button onclick="startCamera()" style="font-size:20px; padding:15px; width:100%;">
-  START CAMERA
-</button>
+<body>
 
-<video id="video" autoplay playsinline style="width:100%; height:auto;"></video>
+<button onclick="start()">START CAMERA & AI</button>
+<video id="video" autoplay playsinline></video>
+
+<div id="result">Waiting…</div>
+<div id="advice"></div>
 
 <script>
-function startCamera() {
-  navigator.mediaDevices.getUserMedia({
+const MODEL_URL = "https://teachablemachine.withgoogle.com/models/i19IE4ia3/";
+let model;
+let history = [];
+
+async function start() {
+  // CAMERA (already proven to work)
+  const stream = await navigator.mediaDevices.getUserMedia({
     video: { facingMode: "environment" }
-  })
-  .then(stream => {
-    document.getElementById("video").srcObject = stream;
-  })
-  .catch(err => {
-    alert("Camera error: " + err.message);
   });
+  const video = document.getElementById("video");
+  video.srcObject = stream;
+
+  // LOAD MODEL
+  model = await tmImage.load(
+    MODEL_URL + "model.json",
+    MODEL_URL + "metadata.json"
+  );
+
+  requestAnimationFrame(loop);
+}
+
+async function loop() {
+  await predict();
+  requestAnimationFrame(loop);
+}
+
+async function predict() {
+  const prediction = await model.predict(document.getElementById("video"));
+
+  let best = prediction.reduce((a, b) =>
+    a.probability > b.probability ? a : b
+  );
+
+  // Smooth results
+  history.push(best.className);
+  if (history.length > 10) history.shift();
+
+  const stable = mostCommon(history);
+  const confidence = (best.probability * 100).toFixed(1);
+
+  document.getElementById("result").innerText =
+    `Prediction: ${stable} (${confidence}%)`;
+
+  showAdvice(stable);
+}
+
+function mostCommon(arr) {
+  return arr.sort((a,b) =>
+    arr.filter(v => v===a).length -
+    arr.filter(v => v===b).length
+  ).pop();
+}
+
+function showAdvice(label) {
+  const advice = document.getElementById("advice");
+  advice.style.display = "block";
+
+  if (label.toLowerCase().includes("disease") ||
+      label.toLowerCase().includes("unhealthy")) {
+    advice.innerHTML = `
+      🚨 PLANT UNHEALTHY<br><br>
+      ✔ Remove infected leaves<br>
+      ✔ Stop over-watering<br>
+      ✔ Use neem oil / fungicide<br>
+      ✔ Isolate plant<br>
+      ✔ Improve sunlight & airflow
+    `;
+  } else {
+    advice.innerHTML = `
+      ✅ PLANT HEALTHY<br><br>
+      ✔ Continue normal care<br>
+      ✔ Monitor weekly<br>
+      ✔ Maintain sunlight & water balance
+    `;
+  }
 }
 </script>
 
