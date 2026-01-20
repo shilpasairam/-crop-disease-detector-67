@@ -1,41 +1,69 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>AI Crop Disease Detector</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Crop Disease Detector</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f7f2;
+      text-align: center;
+      padding: 15px;
+    }
+    button {
+      padding: 12px 20px;
+      font-size: 16px;
+      background: #2e7d32;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    #result {
+      font-size: 24px;
+      font-weight: bold;
+      margin-top: 15px;
+    }
+    .healthy { color: green; }
+    .diseased { color: red; }
+    #advice {
+      margin-top: 10px;
+      font-size: 16px;
+    }
+  </style>
 </head>
+
 <body>
 
-<h2>AI Crop Disease Detector</h2>
-<button type="button" onclick="init()">Start</button>
+<h1>🌱 Crop Disease Detector</h1>
+<p>Point the camera at a leaf</p>
+
+<button onclick="init()">Start Camera</button>
+
 <div id="webcam-container"></div>
-<div id="label-container"></div>
+<div id="result">Waiting...</div>
+<div id="advice"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-
-<script type="text/javascript">
-  const URL = "./";
-
-  let model, webcam, labelContainer, maxPredictions;
+<script>
+  let model, webcam;
 
   async function init() {
-    const modelURL = URL + "model.json";
-    const metadataURL = URL + "metadata.json";
+    const modelURL = "./model.json";
+    const metadataURL = "./metadata.json";
 
     model = await tmImage.load(modelURL, metadataURL);
-    maxPredictions = model.getTotalClasses();
 
-    const flip = true;
-    webcam = new tmImage.Webcam(200, 200, flip);
-    await webcam.setup();
+    webcam = new tmImage.Webcam(300, 300, true);
+    await webcam.setup({ facingMode: "environment" });
     await webcam.play();
-    window.requestAnimationFrame(loop);
 
     document.getElementById("webcam-container").appendChild(webcam.canvas);
-    labelContainer = document.getElementById("label-container");
-    for (let i = 0; i < maxPredictions; i++) {
-      labelContainer.appendChild(document.createElement("div"));
-    }
+    window.requestAnimationFrame(loop);
   }
 
   async function loop() {
@@ -45,11 +73,43 @@
   }
 
   async function predict() {
-    const prediction = await model.predict(webcam.canvas);
-    for (let i = 0; i < maxPredictions; i++) {
-      const classPrediction =
-        prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-      labelContainer.childNodes[i].innerHTML = classPrediction;
+    const predictions = await model.predict(webcam.canvas);
+
+    const healthy = predictions.find(p =>
+      p.className.toLowerCase().includes("healthy")
+    );
+    const diseased = predictions.find(p =>
+      p.className.toLowerCase().includes("diseased")
+    );
+
+    const result = document.getElementById("result");
+    const advice = document.getElementById("advice");
+
+    if (!healthy || !diseased) {
+      result.innerText = "Class name mismatch!";
+      advice.innerText = "Check Teachable Machine class names";
+      return;
+    }
+
+    if (diseased.probability > 0.6) {
+      result.innerHTML = `❌ DISEASED (${(diseased.probability*100).toFixed(1)}%)`;
+      result.className = "diseased";
+      advice.innerHTML = `
+        • Isolate affected plant<br>
+        • Remove infected leaves<br>
+        • Use recommended fungicide
+      `;
+    } else if (healthy.probability > 0.6) {
+      result.innerHTML = `✅ HEALTHY (${(healthy.probability*100).toFixed(1)}%)`;
+      result.className = "healthy";
+      advice.innerHTML = `
+        • Continue regular watering<br>
+        • Ensure sunlight & nutrients
+      `;
+    } else {
+      result.innerHTML = "⚠️ Unclear image";
+      result.className = "";
+      advice.innerText = "Move closer & improve lighting";
     }
   }
 </script>
