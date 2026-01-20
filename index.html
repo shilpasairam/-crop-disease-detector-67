@@ -2,73 +2,85 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Plant Disease Detector</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crop Disease Detector</title>
 
-  <!-- TensorFlow.js -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
-  <!-- Teachable Machine Image -->
+  <!-- TensorFlow & Teachable Machine -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
 
   <style>
     body {
+      margin: 0;
+      padding: 10px;
       font-family: Arial, sans-serif;
       text-align: center;
-      background: #f4f7f9;
-      padding: 10px;
+      background: #f2f7f2;
     }
-    h1 { color: #2c7a2c; }
-    video, img {
-      width: 100%;
-      max-width: 320px;
-      border-radius: 10px;
+    h1 {
+      color: #1b5e20;
     }
     button {
-      padding: 10px 16px;
+      padding: 12px 20px;
       font-size: 16px;
-      margin: 8px;
+      background: #2e7d32;
+      color: white;
       border: none;
       border-radius: 6px;
-      background: #2c7a2c;
-      color: white;
       cursor: pointer;
     }
-    #result {
-      font-size: 18px;
+    #webcam-container {
+      margin-top: 15px;
+    }
+    #status {
+      font-size: 22px;
       font-weight: bold;
-      margin-top: 10px;
+      margin-top: 12px;
+    }
+    .healthy {
+      color: green;
+    }
+    .unhealthy {
+      color: red;
     }
   </style>
 </head>
 
 <body>
-  <h1>Plant Health Detector 🌱</h1>
+
+  <h1>🌱 Crop Disease Detector</h1>
+  <p>Click start and point camera at the leaf</p>
 
   <button onclick="init()">Start Camera</button>
-  <input type="file" accept="image/*" onchange="predictImage(event)">
 
   <div id="webcam-container"></div>
-  <div id="result"></div>
+  <div id="status">Status: Waiting...</div>
 
   <script>
-    const MODEL_URL = "model/";
+    const MODEL_PATH = "./";
 
     let model, webcam, maxPredictions;
 
     async function init() {
-      model = await tmImage.load(
-        MODEL_URL + "model.json",
-        MODEL_URL + "metadata.json"
-      );
+      const modelURL = MODEL_PATH + "model.json";
+      const metadataURL = MODEL_PATH + "metadata.json";
 
-      maxPredictions = model.getTotalClasses();
+      try {
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
 
-      webcam = new tmImage.Webcam(300, 300, true);
-      await webcam.setup();
-      await webcam.play();
-      window.requestAnimationFrame(loop);
+        webcam = new tmImage.Webcam(300, 300, true);
+        await webcam.setup({ facingMode: "environment" }); // back camera
+        await webcam.play();
 
-      document.getElementById("webcam-container").appendChild(webcam.canvas);
+        document.getElementById("webcam-container").appendChild(webcam.canvas);
+        window.requestAnimationFrame(loop);
+
+        console.log("✅ Model & Camera Loaded");
+      } catch (err) {
+        alert("Model or Camera failed to load");
+        console.error(err);
+      }
     }
 
     async function loop() {
@@ -78,25 +90,30 @@
     }
 
     async function predict() {
-      const prediction = await model.predict(webcam.canvas);
-      prediction.sort((a, b) => b.probability - a.probability);
+      const predictions = await model.predict(webcam.canvas);
 
-      document.getElementById("result").innerHTML =
-        prediction[0].className + " : " +
-        (prediction[0].probability * 100).toFixed(2) + "%";
-    }
+      let highest = predictions[0];
+      for (let i = 1; i < predictions.length; i++) {
+        if (predictions[i].probability > highest.probability) {
+          highest = predictions[i];
+        }
+      }
 
-    async function predictImage(event) {
-      const img = new Image();
-      img.src = URL.createObjectURL(event.target.files[0]);
-      img.onload = async () => {
-        const prediction = await model.predict(img);
-        prediction.sort((a, b) => b.probability - a.probability);
-        document.getElementById("result").innerHTML =
-          prediction[0].className + " : " +
-          (prediction[0].probability * 100).toFixed(2) + "%";
-      };
+      const confidence = (highest.probability * 100).toFixed(1);
+      const statusDiv = document.getElementById("status");
+
+      if (highest.className.toLowerCase().includes("unhealthy") ||
+          highest.className.toLowerCase().includes("disease")) {
+
+        statusDiv.innerHTML = `❌ UNHEALTHY (${confidence}%)`;
+        statusDiv.className = "unhealthy";
+
+      } else {
+        statusDiv.innerHTML = `✅ HEALTHY (${confidence}%)`;
+        statusDiv.className = "healthy";
+      }
     }
   </script>
+
 </body>
 </html>
